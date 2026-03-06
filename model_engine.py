@@ -415,3 +415,4 @@ if __name__ == "__main__":
                         "anomaly_score", "xai_reason"]].head(10).to_string(index=False))
 
     print(f"\n📊 Integrity Score: {get_integrity_score()}/100")
+    
