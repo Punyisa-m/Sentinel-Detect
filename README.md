@@ -223,16 +223,6 @@ API_BASE = "https://your-api.railway.app"
 
 ---
 
-## 🗺️ Roadmap
-
-- [ ] JWT authentication for API
-- [ ] WebSocket real-time alert push
-- [ ] LLM-generated investigation report (Claude / GPT-4o)
-- [ ] Slack / LINE notification on CONFIRMED_FRAUD
-- [ ] Export alert log to PDF report
-
----
-
 ## 📄 License
 
 MIT — free for personal and commercial use.
