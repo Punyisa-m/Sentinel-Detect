@@ -1,187 +1,244 @@
 # 🛡️ Sentinel-Detect
-### AI-Powered Employee Behaviour Anomaly Detection System
+
+> **AI-powered Insider Threat Detection Platform** — Real-time employee behaviour anomaly detection with explainable AI, full CRUD management, and a production-ready Docker deployment. Built for resource-constrained environments (runs on 8 GB RAM, free to deploy).
+
+![Banner login](docs/screenshots/banner.png)
 
 ---
 
-## Quick Start
+## ✨ Features
+
+| Feature | Description |
+|---|---|
+| 🔍 **Real-time Scoring** | Isolation Forest anomaly detection on live event streams |
+| 🧠 **Explainable AI (XAI)** | Per-prediction z-score deviation explanation for each anomaly |
+| 📊 **5-Page Dashboard** | Dashboard · Alert Review · Employee CRUD · History · System |
+| ✅ **Alert Workflow** | Whitelist false positives or Confirm Fraud with one click |
+| 👥 **Employee CRUD** | Create, edit, deactivate employees — no code changes needed |
+| 📈 **Historical Trends** | 30-day integrity score and anomaly breakdown charts |
+| ⚡ **FastAPI Backend** | Separated ML scoring API with `/health`, `/score`, `/alerts` |
+| 💾 **SQLite + WAL** | Concurrent-safe database with generator-based memory-efficient reads |
+| 🪵 **Loguru Logging** | Structured logs with auto-rotation (10 MB / 14-day retention) |
+| 🐳 **Docker Ready** | Multi-stage build < 350 MB · RAM-capped at 1 GB total |
+
+---
+
+## 📸 Screenshots
+
+### 1. Dashboard Overview (KPI + Liquid Wave + Charts+ alert)
+![Dashboard](docs/screenshots/01-dashboard.png)
+
+### 2. XAI
+![XAI](docs/screenshots/02-XAI.png)
+
+### 3. Employee CRUD Management
+![CRUD](docs/screenshots/04-User Management.png)
+
+### 4. Audit Tasks
+![Tasks](docs/screenshots/03-Audit Tasks.png)
+
+---
+
+## 🏗️ Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│                  Sentinel-Detect v2                  │
+│                                                      │
+│  ┌─────────────────┐  HTTP   ┌──────────────────┐   │
+│  │  Streamlit UI   │────────▶│  FastAPI         │   │
+│  │  :8501          │         │  /health         │   │
+│  │                 │         │  /score/event    │   │
+│  │  📊 Dashboard   │         │  /score/batch    │   │
+│  │  🔍 Alerts      │◀────────│  /alerts         │   │
+│  │  👥 Employees   │         │  /stats          │   │
+│  │  📈 History     │         │  :8000           │   │
+│  │  ⚙️  System      │         └────────┬─────────┘   │
+│  └─────────────────┘                  │              │
+│                              ┌────────▼─────────┐   │
+│                              │  SQLite (WAL)    │   │
+│                              │  employees       │   │
+│                              │  activity_logs   │   │
+│                              │  alert_logs      │   │
+│                              │  daily_stats     │   │
+│                              └──────────────────┘   │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🚀 Quick Start
+
+### Option 1 — Local
 
 ```bash
-# 1. Install dependencies
+git clone https://github.com/Punyisa-m/Sentinel-Detect.git
+cd sentinel-detect
+
 pip install -r requirements.txt
 
-# 2. Generate synthetic data & seed the database
-python data_generator.py
+# Terminal 1: FastAPI backend
+uvicorn api:app --host 0.0.0.0 --port 8000 --workers 1
 
-# 3. Train the model & score all logs
-python model_engine.py
-
-# 4. Launch the Security Audit Dashboard
+# Terminal 2: Streamlit dashboard
 streamlit run dashboard.py
 ```
 
----
+Open → http://localhost:8501
 
-## System Architecture
+### Option 2 — Docker (Recommended)
 
+```bash
+# Build once, shared image, both services
+docker compose up --build -d
+
+# Monitor RAM
+docker stats
+
+# Logs
+docker compose logs -f api
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Sentinel-Detect                        │
-│                                                             │
-│  ┌──────────────────┐    ┌──────────────────────────────┐  │
-│  │  data_generator  │───▶│      SQLite Database         │  │
-│  │                  │    │  • activity_logs             │  │
-│  │ • Synthetic logs │    │  • audit_tasks               │  │
-│  │ • Anomaly inject │    └──────────┬───────────────────┘  │
-│  │ • Feature eng.   │               │                       │
-│  └──────────────────┘    ┌──────────▼───────────────────┐  │
-│                           │      model_engine            │  │
-│  ┌──────────────────┐    │                              │  │
-│  │   dashboard.py   │◀───│ • Isolation Forest           │  │
-│  │                  │    │ • XAI Explainer              │  │
-│  │ • Integrity Score│    │ • Audit Task trigger         │  │
-│  │ • Alert Feed     │    │ • Real-time scoring          │  │
-│  │ • Visualisations │    └──────────────────────────────┘  │
-│  │ • Audit Tasks    │                                       │
-│  └──────────────────┘                                       │
-└─────────────────────────────────────────────────────────────┘
-```
+
+| Service | URL | RAM Limit |
+|---|---|---|
+| Streamlit UI | http://localhost:8501 | 400 MB |
+| FastAPI + Docs | http://localhost:8000/docs | 600 MB |
+| **Total** | | **≤ 1 GB** ✓ |
 
 ---
 
-## Feature Engineering
-
-The Isolation Forest model is trained on **6 engineered features** derived from raw activity logs. Each was chosen because it captures a distinct fraud or integrity-risk signal.
-
-### Feature 1 — `freq_score` (Event Frequency)
-**What it measures:** Number of events the same employee performed in the **rolling 60-minute window** prior to the current event.
-
-**Why it matters:** A normal employee might access 3–5 documents per hour. An insider threat or compromised credential will exhibit a burst pattern — 20–50 accesses within minutes — that normal work patterns cannot explain.
-
-**How it's computed:**
-```python
-for each event, count events by same employee_id
-where timestamp >= (event.timestamp − 60 min)
-```
-
-### Feature 2 — `duration_minutes` (Task Duration)
-**What it measures:** Wall-clock minutes between task start and completion.
-
-**Why it matters:** Each action type has an expected duration profile (e.g. "Submit Task" ≈ 30 min ± 8 min). A task completing in 0.02 minutes suggests automation/scripted exfiltration. A task taking 1,000+ minutes suggests the session was left open, a sign of credential sharing or abandonment.
-
-**How it's computed:** Directly from the raw log field. Z-score outliers are surfaced by the XAI explainer.
-
-### Feature 3 — `security_level` (Document Sensitivity)
-**What it measures:** Encoded numeric sensitivity of the accessed document: Public=1, Internal=2, Confidential=3, Restricted=4.
-
-**Why it matters:** When combined with dept clearance, high security-level access by a low-clearance employee (e.g. Marketing accessing Restricted HR files) is a strong indicator of privilege escalation or misconfigured ACL.
-
-### Feature 4 — `transaction_amount` (Financial Claim Value)
-**What it measures:** Dollar value of a Financial Claim event (0 for non-financial events).
-
-**Why it matters:** Fraudulent expense claims or payment diversion attacks manifest as outlier amounts — either single large claims or many small claims that aggregate above threshold. IsolationForest isolates these as low-density regions.
-
-### Feature 5 — `hour_of_day` (Temporal Context)
-**What it measures:** Integer hour (0–23) at which the event occurred.
-
-**Why it matters:** After-hours activity (22:00–05:00) combined with high security-level access is a known exfiltration pattern. Legitimate employees rarely access Restricted documents at 3 AM.
-
-### Feature 6 — `action_encoded` (Action Type)
-**What it measures:** Ordinal encoding of the action type (Access Doc=0, Submit Task=1, Financial Claim=2).
-
-**Why it matters:** The distribution of action types per employee follows stable priors. An employee who suddenly shifts from 90% "Submit Task" to 90% "Access Doc" (especially sensitive docs) departs from their behavioural baseline.
-
----
-
-## ML Model: Isolation Forest
-
-### Why Isolation Forest?
-- **Unsupervised**: No labelled anomaly data required — critical in security where novel attacks are unknown.
-- **Scalable**: O(n log n) complexity; handles real-time event streams.
-- **Interpretable**: Anomaly score is a continuous value, enabling risk triage rather than binary flags.
-
-### How It Works
-Isolation Forest builds an ensemble of random decision trees. Anomalous points require **fewer splits** to isolate because they occupy sparse, low-density regions of the feature space. The `score_samples()` output is normalised: values near 0 indicate normal behaviour; values approaching −0.5 indicate strong anomalies.
-
-### Threshold
-`ANOMALY_THRESHOLD = −0.10` — events below this score trigger an Audit Task. This can be tuned via `model_engine.py` depending on the organisation's risk tolerance.
-
-### Contamination
-`CONTAMINATION = 0.08` — tells the model to expect ~8% anomalies during training, aligning with the synthetic injection rate. In production, calibrate from historical confirmed-incident rate.
-
----
-
-## XAI Explainability
-
-For every flagged anomaly, Sentinel-Detect computes a **z-score** for each feature against the training distribution:
-
-```
-z = (feature_value − training_mean) / training_std
-```
-
-Features with |z| ≥ 1.5 are reported in descending order of deviation:
-
-```
-'Task Duration (minutes)' = 0.02 min (18.3σ below mean);
-'Event Frequency (last 60 min)' = 43 events (9.1σ above mean)
-```
-
-This gives security analysts an immediate, actionable reason for each alert rather than a black-box score.
-
----
-
-## Audit Task Hand-off (Orchestra-Agent Integration)
-
-When `anomaly_score < ANOMALY_THRESHOLD`, a record is written to the `audit_tasks` table:
-
-```sql
-INSERT INTO audit_tasks
-  (log_id, employee_id, department, action_type,
-   timestamp, anomaly_score, reason, status)
-VALUES (…, 'OPEN');
-```
-
-An orchestration agent (Orchestra-Agent / Project 2) polls this table for `status = 'OPEN'` records and can:
-- Notify the Security Operations Centre via Slack/email.
-- Trigger an automated account lock after N open tasks for the same employee.
-- Escalate to HR/Legal for high-severity scores.
-- Mark tasks `CLOSED` after review, feeding back to the model as confirmed labels.
-
----
-
-## Fraud Prevention & Compliance
-
-### Internal Fraud Prevention
-| Threat Vector | How Sentinel-Detect Catches It |
-|---|---|
-| Credential theft / account takeover | Frequency burst + after-hours hour_of_day |
-| Privilege escalation | Security level > department clearance |
-| Financial fraud (ghost employees, inflated claims) | Transaction amount outlier |
-| Data exfiltration via bulk download | High freq_score on Restricted docs |
-| Insider threat (slow-burn data theft) | Gradual drift in action_encoded baseline |
-| Automation / scripted attacks | Near-zero duration_minutes |
-
-### Compliance Alignment
-- **SOX (Sarbanes-Oxley)**: Financial claim outlier detection supports internal controls over financial reporting.
-- **GDPR / Data Protection**: Restricted-document access monitoring limits unauthorised PII access.
-- **ISO 27001 / NIST CSF**: Continuous monitoring and audit trail support Annex A.12 (Operations Security) and NIST DE.CM-7 (Monitoring for unauthorized activity).
-- **Audit Trail**: Every scored event is immutably stored in SQLite with timestamps, making it court-admissible evidence.
-
----
-
-## File Structure
+## 📁 Project Structure
 
 ```
 sentinel-detect/
-├── data_generator.py     # Synthetic log generation, anomaly injection, feature engineering
-├── model_engine.py       # Isolation Forest training, scoring, XAI, audit task creation
-├── dashboard.py          # Streamlit Security Audit Dashboard
-├── requirements.txt      # Python dependencies
-├── sentinel.db           # SQLite database (auto-created)
-├── sentinel_model.joblib # Trained Isolation Forest (auto-created)
-├── sentinel_scaler.joblib# Feature scaler (auto-created)
-└── sentinel_feature_stats.joblib  # Feature stats for XAI (auto-created)
+├── api.py                       # FastAPI — /health /score /alerts /stats
+├── dashboard.py                 # Streamlit — 5-page UI (Dashboard/Alerts/Employees/History/System)
+├── auth.py                      # PBKDF2-SHA256 authentication + RBAC (admin/manager)
+├── data_generator.py            # Synthetic logs, anomaly injection, feature engineering
+├── model_engine.py              # Isolation Forest training, XAI explainer, batch scoring
+├── requirements.txt             # Python dependencies
+├── Dockerfile                   # Multi-stage build on python:3.11-slim (< 350 MB)
+├── docker-compose.yml           # API + UI shared image, RAM-limited to 1 GB total
+├── .gitignore
+├── docs/
+│   └── screenshots/            
+│       ├── banner.png
+│       ├── 01-dashboard.png
+│       ├── 02-XAI.png
+│       ├── 03-Audit Tasks.png
+│       └── 04-User Management.png
+│
+│   ── Auto-generated (git-ignored) ──
+├── sentinel.db                  # SQLite database
+├── sentinel_model.joblib        # Trained Isolation Forest
+├── sentinel_scaler.joblib       # Feature scaler
+├── sentinel_feature_stats.joblib# Feature stats for XAI z-score computation
+└── logs/
+    └── sentinel_api.log         # Auto-rotated (10 MB / 14 days)
 ```
 
 ---
 
-*Sentinel-Detect v1.0 — Built with scikit-learn, Pandas, SQLite, Streamlit & Plotly*
+## 🧠 ML Pipeline
+
+```
+Raw Logs → Feature Engineering (6 features) → Isolation Forest → XAI Explanation → Alert Log
+```
+
+| Feature | What it detects |
+|---|---|
+| `freq_score` | Burst access patterns → credential theft |
+| `duration_minutes` | Near-zero = automation, extreme = abandonment |
+| `security_level` | Privilege escalation (1=Public → 4=Restricted) |
+| `transaction_amount` | Financial fraud outliers |
+| `hour_of_day` | After-hours exfiltration |
+| `action_encoded` | Behavioural drift from user baseline |
+
+**Model:** `IsolationForest(n_estimators=200, contamination=0.08)`  
+**Threshold:** score < −0.10 triggers audit alert  
+**XAI output:** *"Task Duration = 0.02 min (18.3σ below mean)"*
+
+---
+
+## 🔌 API Reference
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | System status, RAM, model state |
+| `POST` | `/score/event` | Score + persist + auto-create alert |
+| `POST` | `/score/batch` | Memory-efficient bulk scoring |
+| `GET` | `/alerts` | Paginated alerts with status filter |
+| `PATCH` | `/alerts/{id}/review` | Whitelist / Confirm Fraud / Close |
+| `GET` | `/stats/kpis` | Live KPI summary |
+| `GET` | `/stats/daily` | 30-day historical stats |
+
+Interactive docs → http://localhost:8000/docs
+
+---
+
+## ☁️ Free Deployment
+
+### Streamlit Community Cloud
+```bash
+# 1. Push to GitHub
+git push
+
+# 2. https://share.streamlit.io → New app → select repo → Deploy ✓
+```
+
+### Hugging Face Spaces
+```bash
+cp dashboard.py app.py   # HF requires app.py as entry point
+git push                 # to your HF Space repo
+```
+
+### FastAPI on Railway (free 500 hrs/month)
+```bash
+npm install -g @railway/cli
+railway login && railway init && railway up
+```
+
+---
+
+## ⚙️ Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `API_BASE` | `http://localhost:8000` | FastAPI endpoint |
+
+`.streamlit/secrets.toml`:
+```toml
+API_BASE = "https://your-api.railway.app"
+```
+
+---
+
+## 🛠️ Tech Stack
+
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.32-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.4-F7931E?style=flat-square&logo=scikit-learn&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Multi--stage-2496ED?style=flat-square&logo=docker&logoColor=white)
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] JWT authentication for API
+- [ ] WebSocket real-time alert push
+- [ ] LLM-generated investigation report (Claude / GPT-4o)
+- [ ] Slack / LINE notification on CONFIRMED_FRAUD
+- [ ] Export alert log to PDF report
+
+---
+
+## 📄 License
+
+MIT — free for personal and commercial use.
+
+---
+
+<div align="center">
+  Built with ❤️ &nbsp;·&nbsp; Python 3.11 &nbsp;·&nbsp; Free to deploy &nbsp;·&nbsp; 8 GB RAM friendly
+</div>
