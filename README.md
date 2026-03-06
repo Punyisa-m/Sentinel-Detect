@@ -32,10 +32,10 @@
 ![XAI](docs/screenshots/02-XAI.png)
 
 ### 3. Employee CRUD Management
-![CRUD](docs/screenshots/04-User Management.png)
+![CRUD](docs/screenshots/04-UserManagement.png)
 
 ### 4. Audit Tasks
-![Tasks](docs/screenshots/03-Audit Tasks.png)
+![Tasks](docs/screenshots/03-AuditTasks.png)
 
 ---
 
